@@ -1,0 +1,19 @@
+# Noctifab runtime & secrets
+.noctifab/data/
+.noctifab/logs/
+.noctifab/report/
+.noctifab/secrets.yaml
+.noctifab/noctifab.pid
+
+# Go build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.out
+*.test
