@@ -1,12 +1,13 @@
 package tests
 
 import (
+	"bytes"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
 
-func TestCLI(t *testing.T) {
+func TestCLIIntegration(t *testing.T) {
 	tempDir := t.TempDir()
 	binPath := filepath.Join(tempDir, "echo-cli")
 
@@ -16,36 +17,61 @@ func TestCLI(t *testing.T) {
 		t.Fatalf("failed to build echo-cli: %v, output: %s", err, string(out))
 	}
 
-	t.Run("with args", func(t *testing.T) {
-		cmd := exec.Command(binPath, "hello", "world")
-		stdout, err := cmd.Output()
-		if err != nil {
-			t.Fatalf("execution failed: %v", err)
-		}
-		if got := string(stdout); got != "hello\n" {
-			t.Errorf("got %q, want %q", got, "hello\n")
-		}
-	})
+	tests := []struct {
+		name       string
+		args       []string
+		wantStdout string
+	}{
+		{
+			name:       "row 1: echo-cli hello world",
+			args:       []string{"hello", "world"},
+			wantStdout: "hello\n",
+		},
+		{
+			name:       "row 2: echo-cli hello",
+			args:       []string{"hello"},
+			wantStdout: "hello\n",
+		},
+		{
+			name:       "row 3: echo-cli",
+			args:       []string{},
+			wantStdout: "\n",
+		},
+		{
+			name:       "row 4: echo-cli \"hello world\" foo",
+			args:       []string{"hello world", "foo"},
+			wantStdout: "hello world\n",
+		},
+		{
+			name:       "row 5: echo-cli \"\"",
+			args:       []string{""},
+			wantStdout: "\n",
+		},
+	}
 
-	t.Run("with whitespace arg", func(t *testing.T) {
-		cmd := exec.Command(binPath, "hello world", "foo")
-		stdout, err := cmd.Output()
-		if err != nil {
-			t.Fatalf("execution failed: %v", err)
-		}
-		if got := string(stdout); got != "hello world\n" {
-			t.Errorf("got %q, want %q", got, "hello world\n")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command(binPath, tt.args...)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
 
-	t.Run("without args", func(t *testing.T) {
-		cmd := exec.Command(binPath)
-		stdout, err := cmd.Output()
-		if err != nil {
-			t.Fatalf("execution failed: %v", err)
-		}
-		if got := string(stdout); got != "\n" {
-			t.Errorf("got %q, want %q", got, "\n")
-		}
-	})
+			err := cmd.Run()
+			if err != nil {
+				t.Fatalf("unexpected execution error: %v", err)
+			}
+
+			if code := cmd.ProcessState.ExitCode(); code != 0 {
+				t.Errorf("exit code = %d; want 0", code)
+			}
+
+			if gotStderr := stderr.String(); gotStderr != "" {
+				t.Errorf("stderr = %q; want empty", gotStderr)
+			}
+
+			if gotStdout := stdout.String(); gotStdout != tt.wantStdout {
+				t.Errorf("stdout = %q; want %q", gotStdout, tt.wantStdout)
+			}
+		})
+	}
 }
